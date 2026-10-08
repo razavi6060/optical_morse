@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Optical Morse - Torch Test</title>
+<style>
+body{font-family:Arial;text-align:center;background:#111;color:white;padding:25px}
+button{font-size:20px;padding:12px 25px;margin:10px}
+#status{font-size:18px;margin:20px}
+</style>
+</head>
+<body>
+<h2>Optical Morse Messenger</h2>
+<p>برای آزمایش فلش موبایل، دکمه زیر را بزن.</p>
+<button onclick="startTorch()">START TORCH TEST</button>
+<button onclick="stopTorch()">STOP</button>
+<div id="status">Status: OFF</div>
+
+<script>
+let track = null;
+
+async function startTorch(){
+    try{
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video:{facingMode:{ideal:"environment"}}
+        });
+
+        track = stream.getVideoTracks()[0];
+
+        const capabilities = track.getCapabilities();
+
+        if (!capabilities.torch){
+            document.getElementById("status").innerText =
+                "Torch is not supported by this browser.";
+            track.stop();
+            track = null;
+            return;
+        }
+
+        await track.applyConstraints({
+            advanced:[{torch:true}]
+        });
+
+        document.getElementById("status").innerText =
+            "Torch: ON";
+    }catch(error){
+        document.getElementById("status").innerText =
+            "Error: " + error.message;
+    }
+}
+
+async function stopTorch(){
+    if(track){
+        try{
+            await track.applyConstraints({
+                advanced:[{torch:false}]
+            });
+        }catch(e){}
+
+        track.stop();
+        track = null;
+    }
+
+    document.getElementById("status").innerText =
+        "Torch: OFF";
+}
+</script>
+</body>
+</html>
