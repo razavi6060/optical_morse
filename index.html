@@ -3,27 +3,51 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Optical Morse - Torch Test</title>
+
+<title>Optical Morse Messenger</title>
 
 <style>
+
 body{
     font-family:Arial;
     text-align:center;
     background:#111;
     color:white;
-    padding:25px
+    padding:20px;
+}
+
+input{
+    font-size:20px;
+    padding:12px;
+    width:85%;
+    margin:10px;
 }
 
 button{
     font-size:20px;
     padding:12px 25px;
-    margin:10px
+    margin:8px;
 }
 
 #status{
     font-size:18px;
-    margin:20px
+    margin:15px;
 }
+
+#morse{
+    font-size:20px;
+    margin:20px;
+    word-break:break-word;
+}
+
+#light{
+    width:250px;
+    height:180px;
+    margin:20px auto;
+    background:black;
+    border:2px solid white;
+}
+
 </style>
 </head>
 
@@ -31,74 +55,360 @@ button{
 
 <h2>Optical Morse Messenger</h2>
 
-<p>برای آزمایش فلش موبایل، دکمه زیر را بزن.</p>
+<input id="message" type="text" placeholder="Enter message">
 
-<button onclick="startTorch()">START TORCH TEST</button>
-<button onclick="stopTorch()">STOP</button>
+<br>
+
+<button onclick="startSender()">SEND</button>
+
+<button onclick="stopSender()">STOP</button>
+
+<div id="morse">Morse:</div>
 
 <div id="status">Status: OFF</div>
 
+<div id="light"></div>
+
+
 <script>
+
+const MORSE = {
+
+A:".-",
+B:"-...",
+C:"-.-.",
+D:"-..",
+E:".",
+F:"..-.",
+G:"--.",
+H:"....",
+I:"..",
+J:".---",
+K:"-.-",
+L:".-..",
+M:"--",
+N:"-.",
+O:"---",
+P:".--.",
+Q:"--.-",
+R:".-.",
+S:"...",
+T:"-",
+U:"..-",
+V:"...-",
+W:".--",
+X:"-..-",
+Y:"-.--",
+Z:"--.."
+
+};
+
 
 let track = null;
 
+let stopRequested = false;
+
+
+function textToMorse(text){
+
+    let result = "";
+
+    for(let char of text.toUpperCase()){
+
+        if(MORSE[char]){
+
+            result += MORSE[char] + " ";
+
+        }
+
+        else if(char === " "){
+
+            result += "/ ";
+
+        }
+
+    }
+
+    return result.trim();
+
+}
+
+
+function sleep(ms){
+
+    return new Promise(resolve => setTimeout(resolve, ms));
+
+}
+
+
 async function startTorch(){
+
+    if(track){
+
+        return;
+
+    }
 
     try{
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video:{
-                facingMode:{ideal:"environment"}
-            }
-        });
+        const stream =
+            await navigator.mediaDevices.getUserMedia({
+
+                video:{
+                    facingMode:{
+                        ideal:"environment"
+                    }
+                }
+
+            });
+
 
         track = stream.getVideoTracks()[0];
 
-        const capabilities = track.getCapabilities();
+
+        const capabilities =
+            track.getCapabilities();
+
 
         if(!capabilities.torch){
 
             document.getElementById("status").innerText =
-                "Torch is not supported by this browser.";
+                "Torch is not supported.";
 
             track.stop();
+
             track = null;
 
             return;
+
         }
 
+
         await track.applyConstraints({
-            advanced:[{torch:true}]
+
+            advanced:[
+                {torch:true}
+            ]
+
         });
+
 
         document.getElementById("status").innerText =
             "Torch: ON";
+
 
     }catch(error){
 
         document.getElementById("status").innerText =
             "Error: " + error.message;
+
     }
+
 }
 
-async function stopTorch(){
+
+async function turnTorchOff(){
 
     if(track){
 
         try{
 
             await track.applyConstraints({
-                advanced:[{torch:false}]
+
+                advanced:[
+                    {torch:false}
+                ]
+
             });
 
         }catch(e){}
 
-        track.stop();
-        track = null;
     }
 
+    document.getElementById("light").style.backgroundColor =
+        "black";
+
+}
+
+
+async function startSender(){
+
+    let text =
+        document.getElementById("message").value;
+
+
+    if(text.trim() === ""){
+
+        return;
+
+    }
+
+
+    stopRequested = false;
+
+
+    document.getElementById("morse").innerText =
+        "Morse: " + textToMorse(text);
+
+
+    await startTorch();
+
+
+    if(!track){
+
+        return;
+
+    }
+
+
+    for(let char of text.toUpperCase()){
+
+
+        if(stopRequested){
+
+            break;
+
+        }
+
+
+        if(char === " "){
+
+            await turnTorchOff();
+
+            await sleep(5000);
+
+            continue;
+
+        }
+
+
+        let code = MORSE[char];
+
+
+        if(!code){
+
+            continue;
+
+        }
+
+
+        for(let symbol of code){
+
+
+            if(stopRequested){
+
+                break;
+
+            }
+
+
+            if(symbol === "."){
+
+                await turnTorchOn();
+
+                await sleep(300);
+
+                await turnTorchOff();
+
+                await sleep(300);
+
+            }
+
+
+            else if(symbol === "-"){
+
+                await turnTorchOn();
+
+                await sleep(900);
+
+                await turnTorchOff();
+
+                await sleep(300);
+
+            }
+
+        }
+
+
+        if(!stopRequested){
+
+            await sleep(2500);
+
+        }
+
+    }
+
+
+    await turnTorchOff();
+
+
+    if(track){
+
+        track.stop();
+
+        track = null;
+
+    }
+
+
     document.getElementById("status").innerText =
-        "Torch: OFF";
+        "Status: OFF";
+
+}
+
+
+async function turnTorchOn(){
+
+    if(!track){
+
+        return;
+
+    }
+
+
+    try{
+
+        await track.applyConstraints({
+
+            advanced:[
+                {torch:true}
+            ]
+
+        });
+
+
+        document.getElementById("light").style.backgroundColor =
+            "white";
+
+
+        document.getElementById("status").innerText =
+            "Torch: ON";
+
+    }catch(e){}
+
+}
+
+
+async function stopSender(){
+
+    stopRequested = true;
+
+
+    await turnTorchOff();
+
+
+    if(track){
+
+        track.stop();
+
+        track = null;
+
+    }
+
+
+    document.getElementById("status").innerText =
+        "Status: OFF";
+
 }
 
 </script>
